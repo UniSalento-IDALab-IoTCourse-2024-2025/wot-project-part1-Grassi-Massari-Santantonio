@@ -1,5 +1,5 @@
 
-# Progetto Universitario: Applicazione Mobile FASTGO
+#  Applicazione Mobile FASTGO
 
 ## Descrizione
 
