@@ -1,5 +1,5 @@
 
-#  Applicazione Mobile FASTGO
+#  Applicazione Mobile CLIENTE FASTGO
 
 ## Descrizione
 
