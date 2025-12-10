@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import com.fastgo.authentication.fatsgo_authentication.domain.Role;
 import com.fastgo.authentication.fatsgo_authentication.domain.State;
 import com.fastgo.authentication.fatsgo_authentication.domain.User;
+import com.fastgo.authentication.fatsgo_authentication.dto.PictureUrlDto;
 import com.fastgo.authentication.fatsgo_authentication.dto.RegistrationResultDTO;
 import com.fastgo.authentication.fatsgo_authentication.dto.RiderDto;
 import com.fastgo.authentication.fatsgo_authentication.dto.ShopKeeperDto;
@@ -21,6 +22,7 @@ import com.fastgo.authentication.fatsgo_authentication.security.JwtUtilities;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +64,7 @@ public class RegistrationService {
     }
 
   
-    public User registerNewUser(String email, String username, String password, String name, String lastName, Role role) {
+    public User registerNewUser(String email, String username, String password, String name, String lastName, String pictureUrl, Role role) {
         
         User newUser = new User();
         newUser.setUsername(username);
@@ -70,6 +72,7 @@ public class RegistrationService {
         newUser.setPassword(passwordEncoder.encode(password));
         newUser.setRole(role);
         newUser.setStatus(State.ACTIVE);
+        newUser.setPictureUrl(pictureUrl);
         if (Role.USER.equals(role)) {
             newUser.setSynchronized(true);
             
@@ -138,7 +141,7 @@ public class RegistrationService {
     @SuppressWarnings("null")
     @Async
     public void synchronizeShopKeeper(ShopKeeperDto shopKeeperDto) {
-        log.info("Tentativo di sincronizzazione per l'utente ID: {}", shopKeeperDto.getId());
+        log.info("Tentativo di sincronizzazione per il venditore ID: {}", shopKeeperDto.getId());
 
         try {
 
@@ -186,6 +189,22 @@ public class RegistrationService {
                     userRepository.delete(user);
                 });
         }
+    }
+
+
+    public ResponseEntity<?> getPictureUrlFromToken(String token) {
+        token = token.replace("Bearer ", "");
+        String username = jwtUtilities.extractUsername(token);
+        if(jwtUtilities.validateToken(token, username)) {
+            Optional<User> user = userRepository.findByUsername(username);
+            if (user.isPresent() && user.get().getPictureUrl() != null) {
+                PictureUrlDto pictureUrlDto = new PictureUrlDto(user.get().getPictureUrl());
+                return ResponseEntity.ok(pictureUrlDto);
+            } else {
+                return ResponseEntity.status(404).body("Utente non trovato o immagine non disponibile");
+            }
+        } 
+        throw new UnsupportedOperationException("Unimplemented method 'getPictureUrlFromToken'");
     }
 
 }
