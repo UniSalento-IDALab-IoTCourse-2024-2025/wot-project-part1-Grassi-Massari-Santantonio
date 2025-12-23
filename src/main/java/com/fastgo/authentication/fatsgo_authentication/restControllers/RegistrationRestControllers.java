@@ -78,7 +78,7 @@ public class RegistrationRestControllers {
         registrationResultDTO.setResult(RegistrationResultDTO.OK);
         registrationResultDTO.setMessage("Client registration successful");
 
-        
+        registrationService.synchronizeClient(userDTO);
         
         return new ResponseEntity<>(registrationResultDTO, HttpStatus.OK);
     }

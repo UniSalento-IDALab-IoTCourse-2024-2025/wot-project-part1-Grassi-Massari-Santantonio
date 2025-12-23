@@ -11,10 +11,12 @@ import org.springframework.stereotype.Service;
 import com.fastgo.authentication.fatsgo_authentication.domain.Role;
 import com.fastgo.authentication.fatsgo_authentication.domain.State;
 import com.fastgo.authentication.fatsgo_authentication.domain.User;
+import com.fastgo.authentication.fatsgo_authentication.dto.ClientDto;
 import com.fastgo.authentication.fatsgo_authentication.dto.PictureUrlDto;
 import com.fastgo.authentication.fatsgo_authentication.dto.RegistrationResultDTO;
 import com.fastgo.authentication.fatsgo_authentication.dto.RiderDto;
 import com.fastgo.authentication.fatsgo_authentication.dto.ShopKeeperDto;
+import com.fastgo.authentication.fatsgo_authentication.dto.SyncClientDto;
 import com.fastgo.authentication.fatsgo_authentication.dto.SyncRiderDto;
 import com.fastgo.authentication.fatsgo_authentication.dto.SyncShopDto;
 import com.fastgo.authentication.fatsgo_authentication.repositories.UserRepository;
@@ -57,6 +59,7 @@ public class RegistrationService {
 
     private final String ROUTING_KEY_RIDER_SYNC = "rider.sync.request";
     private final String ROUTING_KEY_SHOP_SYNC = "shop.sync.request";
+    private final String ROUTING_KEY_CLIENT_SYNC = "client.sync.request";
 
 
     public ResponseEntity<RegistrationResultDTO> checkCredentials(String email, String username) {
@@ -183,6 +186,60 @@ public class RegistrationService {
         } catch (Exception e) {
             log.error("Errore durante la chiamata RPC di RabbitMQ per l'utente ID: " + shopKeeperDto.getId(), e);
              userRepository.findById(shopKeeperDto.getId()).ifPresent(user -> {
+                    
+                    String userEmail = user.getEmail();
+                    //invio email
+                    userRepository.delete(user);
+                });
+        }
+    }
+
+
+        @SuppressWarnings("null")
+    @Async
+    public void synchronizeClient(ClientDto clientDto) {
+        log.info("Tentativo di sincronizzazione per il venditore ID: {}", clientDto.getId());
+
+        try {
+
+            User user = userRepository.findById(clientDto.getId())
+                    .orElseThrow(() -> new RuntimeException("Utente non trovato per la sincronizzazione: " + clientDto.getId()));
+
+
+            Map<String, Object> claims = new HashMap<>();
+            claims.put("userId", clientDto.getId());
+            claims.put("role", clientDto.getRole().toString());
+            final String jwt = jwtUtilities.generateToken(clientDto.getUsername(), claims);
+
+            SyncClientDto syncClientDto = new SyncClientDto();
+            syncClientDto.setToken(jwt);
+            syncClientDto.setClientDto(clientDto);
+
+            Object response = rabbitTemplate.convertSendAndReceive(
+                    syncExchange,
+                    ROUTING_KEY_CLIENT_SYNC,
+                    syncClientDto
+            );
+
+            if (response != null && "OK".equals(response.toString())) {
+                log.info("Sincronizzazione confermata per l'utente ID: {}. Aggiorno il DB.", clientDto.getId());
+                
+               
+                user.setSynchronized(true);
+                userRepository.save(user);
+
+            } else {
+                log.warn("Sincronizzazione fallita per l'utente ID: {}. Risposta ricevuta: {}", clientDto.getId(), response);
+                //invio email di notifica all'utente
+                    String userEmail = user.getEmail();
+                    //invio email
+                    userRepository.delete(user);
+               
+            }
+
+        } catch (Exception e) {
+            log.error("Errore durante la chiamata RPC di RabbitMQ per l'utente ID: " + clientDto.getId(), e);
+             userRepository.findById(clientDto.getId()).ifPresent(user -> {
                     
                     String userEmail = user.getEmail();
                     //invio email
